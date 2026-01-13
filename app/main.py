@@ -2,6 +2,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from .schemas import TranscriptInput
 from .soap_generator import SOAPGenerator
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
 
 app = FastAPI(
     title="Clinical Note AI",
@@ -19,9 +22,12 @@ app.add_middleware(
 
 generator = SOAPGenerator()
 
+app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
+
+
 @app.get("/")
-def root():
-    return {"message": "Clinical SOAP Note AI running"}
+async def root():
+    return FileResponse("frontend/index.html")
 
 @app.post("/generate-soap")
 def generate_soap(data: TranscriptInput):
