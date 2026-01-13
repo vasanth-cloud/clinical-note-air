@@ -85,7 +85,7 @@
       output.textContent = 'Processing...';
 
       try {
-        const response = await fetch('http://127.0.0.1:8001/generate-soap', {
+        const response = await fetch('/generate-soap', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
