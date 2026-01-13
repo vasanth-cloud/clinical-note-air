@@ -22,12 +22,12 @@ app.add_middleware(
 
 generator = SOAPGenerator()
 
-app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
+app.mount("/frontend", StaticFiles(directory="app/frontend"), name="frontend")
 
 
 @app.get("/")
 async def root():
-    return FileResponse("frontend/index.html")
+    return FileResponse("app/frontend/index.html")
 
 @app.post("/generate-soap")
 def generate_soap(data: TranscriptInput):
