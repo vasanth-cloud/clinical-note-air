@@ -9,11 +9,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy app code
 COPY ./app /code/app/
 
-# Copy static files
-COPY ./static /code/static/
+# Copy frontend files (your actual structure)
+COPY ./frontend /code/frontend/
 
-# Expose port
-EXPOSE 8000
+# Expose port for Render
+EXPOSE 10000
 
-# Run with uvicorn (Render expects port 10000, but we'll map it)
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "10000"]
