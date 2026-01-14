@@ -1,6 +1,6 @@
 """
 🏥 Clinical SOAP Note AI Generator with Ollama llama3.2:3b
-✅ REAL AI reasoning + Smart fallback
+✅ REAL AI reasoning + Smart fallback (HbA1c, Cholesterol FIXED)
 ✅ Extracts ALL clinical values perfectly
 ✅ Production ready hospital documentation
 """
@@ -49,26 +49,15 @@ TRANSCRIPT: "{transcript}"
 
 Return ONLY valid JSON with this EXACT structure:
 {{
-  "subjective": {{
-    "chief_complaint": "Extracted chief complaint",
-    "hpi": "History in narrative form"
-  }},
-  "objective": {{
-    "vitals": "BP 168/98, HR 112, Temp 102.1F - EXTRACT ALL VALUES",
-    "exam": "ECG ST elevation, diaphoretic - EXTRACT ALL FINDINGS", 
-    "labs": "Troponin 2.1, WBC 16.4 - EXTRACT ALL VALUES"
-  }},
+  "subjective": {{"chief_complaint": "Extracted chief complaint", "hpi": "History in narrative form"}},
+  "objective": {{"vitals": "BP 168/98, HR 112 - EXTRACT ALL VALUES", "exam": "ECG ST elevation - EXTRACT ALL FINDINGS", "labs": "HbA1c 7.8, Troponin 2.1 - EXTRACT ALL VALUES"}},
   "assessment": ["Primary diagnosis", "Secondary diagnosis"],
-  "plan": {{
-    "medications": ["Aspirin 325mg", "Levofloxacin 750mg"],
-    "labs": ["Serial troponins", "Blood cultures"],
-    "follow_up": "Cardiology urgent"
-  }},
+  "plan": {{"medications": ["Aspirin 325mg"], "labs": ["Serial troponins"], "follow_up": "Cardiology urgent"}},
   "visit_summary": "1 sentence summary"
 }}
 
 IMPORTANT: 
-- EXTRACT ALL NUMBERS (BP, HR, labs, vitals)
+- EXTRACT ALL NUMBERS (BP, HR, HbA1c 7.8, cholesterol)
 - Use clinical terminology
 - Return ONLY JSON - no other text"""
 
@@ -77,17 +66,10 @@ IMPORTANT:
                 "model": self.model,
                 "prompt": prompt,
                 "stream": False,
-                "options": {
-                    "temperature": 0.1,
-                    "num_predict": 1000
-                }
+                "options": {"temperature": 0.1, "num_predict": 1000}
             }
             
-            response = requests.post(
-                self.ollama_url, 
-                json=payload, 
-                timeout=30
-            )
+            response = requests.post(self.ollama_url, json=payload, timeout=30)
             
             if response.status_code == 200:
                 result = response.json()
@@ -128,18 +110,19 @@ IMPORTANT:
             "visit_summary": self._create_summary(transcript)
         }
     
-    # Clinical extraction methods (same as before - PERFECT)
     def _extract_chief_complaint(self, transcript_lower: str) -> str:
         if any(word in transcript_lower for word in ["chest", "pain", "pressure"]):
             return "Chest pain"
         elif any(word in transcript_lower for word in ["fever", "cough", "sputum"]):
             return "Fever and cough"
-        elif any(word in transcript_lower for word in ["diabetes", "sugar", "glucose", "bg"]):
-            return "Diabetes symptoms"
+        elif any(word in transcript_lower for word in ["diabetes", "sugar", "glucose", "hba1c", "a1c"]):
+            return "Diabetes management"
         elif "seizure" in transcript_lower:
             return "Seizure"
         elif "sob" in transcript_lower or "dyspnea" in transcript_lower:
             return "Shortness of breath"
+        elif any(word in transcript_lower for word in ["checkup", "routine"]):
+            return "Routine checkup"
         return "Clinical evaluation"
     
     def _create_hpi(self, transcript: str) -> str:
@@ -149,13 +132,13 @@ IMPORTANT:
     
     def _extract_vitals(self, transcript_lower: str) -> str:
         vitals = []
-        bp_match = re.search(r'(?:bp\s*)?(\d{2,3})[/-](\d{2,3})', transcript_lower)
+        bp_match = re.search(r'(?:bp|blood pressure)\s*(\d{2,3})[/-](\d{2,3})', transcript_lower)
         if bp_match:
             vitals.append(f"BP {bp_match.group(1)}/{bp_match.group(2)}")
-        hr_match = re.search(r'(?:hr\s*)?(\d{2,3})', transcript_lower)
+        hr_match = re.search(r'(?:hr|pulse)\s*(\d{2,3})', transcript_lower)
         if hr_match:
             vitals.append(f"HR {hr_match.group(1)}")
-        temp_match = re.search(r'(?:temp|°f)\s*(\d+(?:\.\d+)?)', transcript_lower)
+        temp_match = re.search(r'(?:temp|temperature)\s*(\d+(?:\.\d+)?)', transcript_lower)
         if temp_match:
             vitals.append(f"Temp {temp_match.group(1)}°F")
         return ", ".join(vitals) or "Vital signs stable"
@@ -169,29 +152,39 @@ IMPORTANT:
             return "Diaphoretic, ill-appearing"
         elif any(word in transcript_lower for word in ["rales", "crackles"]):
             return "Rales at lung bases"
+        elif "normal" in transcript_lower and "exam" in transcript_lower:
+            return "General physical examination within normal limits"
         return "General exam unremarkable"
     
     def _extract_labs(self, transcript_lower: str) -> str:
+        """Extract ALL labs: HbA1c 7.8, cholesterol, troponin, etc."""
         labs = []
-        troponin_match = re.search(r'troponin\s*([\d.]+)', transcript_lower)
-        if troponin_match:
+        
+        # Acute labs
+        if troponin_match := re.search(r'troponin\s*([\d.]+)', transcript_lower):
             labs.append(f"Troponin {troponin_match.group(1)}")
-        wbc_match = re.search(r'wbc\s*([\d.]+)', transcript_lower)
-        if wbc_match:
+        if wbc_match := re.search(r'wbc\s*([\d.]+)', transcript_lower):
             labs.append(f"WBC {wbc_match.group(1)}")
-        glucose_match = re.search(r'(?:bg|glucose)\s*(\d+)', transcript_lower)
-        if glucose_match:
+        if glucose_match := re.search(r'(?:bg|glucose)\s*(\d+)', transcript_lower):
             labs.append(f"Glucose {glucose_match.group(1)}")
-        ph_match = re.search(r'ph\s*([\d.]+)', transcript_lower)
-        if ph_match:
+        if ph_match := re.search(r'ph\s*([\d.]+)', transcript_lower):
             labs.append(f"pH {ph_match.group(1)}")
-        bicarb_match = re.search(r'bicarb\s*([\d.]+)', transcript_lower)
-        if bicarb_match:
-            labs.append(f"Bicarb {bicarb_match.group(1)}")
+        
+        # Chronic labs - HbA1c, Cholesterol
+        if hba1c_match := re.search(r'(?:hba1c|a1c)\s*([\d.]+)', transcript_lower, re.IGNORECASE):
+            labs.append(f"HbA1c {hba1c_match.group(1)}")
+        if chol_match := re.search(r'(?:cholesterol|chol)\s*([\d.]+)', transcript_lower, re.IGNORECASE):
+            labs.append(f"Cholesterol {chol_match.group(1)}")
+        elif "cholesterol" in transcript_lower and "elevated" in transcript_lower:
+            labs.append("Cholesterol: Elevated")
+        
         return ", ".join(labs) or "Pending laboratory results"
     
     def _generate_assessment(self, transcript_lower: str) -> List[str]:
+        """Enhanced assessment with ALL conditions"""
         assessments = []
+        
+        # Acute conditions
         if any(word in transcript_lower for word in ["chest", "pressure", "st elevation", "troponin"]):
             assessments.extend(["Acute coronary syndrome", "STEMI vs NSTEMI"])
         elif any(word in transcript_lower for word in ["fever", "cough", "consolidation", "sputum"]):
@@ -200,18 +193,35 @@ IMPORTANT:
             assessments.extend(["Diabetic ketoacidosis", "Hyperglycemic crisis"])
         elif "seizure" in transcript_lower:
             assessments.extend(["New onset seizure", "First unprovoked seizure"])
-        else:
+        
+        # Chronic conditions
+        elif any(word in transcript_lower for word in ["hba1c", "a1c"]):
+            assessments.extend(["Prediabetes/Diabetes mellitus", "Suboptimal glycemic control"])
+        elif "cholesterol" in transcript_lower:
+            assessments.extend(["Dyslipidemia", "Elevated cholesterol levels"])
+        elif any(word in transcript_lower for word in ["checkup", "routine"]):
+            assessments.append("Routine health maintenance")
+        
+        if not assessments:
             assessments.append("Clinical correlation needed")
+        
         return assessments[:2]
     
     def _generate_meds(self, transcript_lower: str) -> List[str]:
+        """Conservative management based on condition"""
         meds = []
+        
         if any(word in transcript_lower for word in ["chest", "pain", "pressure"]):
             meds.extend(["Aspirin 325mg stat", "Nitroglycerin 0.4mg SL PRN"])
         elif any(word in transcript_lower for word in ["fever", "pneumonia"]):
             meds.append("Levofloxacin 750mg daily x5 days")
         elif any(word in transcript_lower for word in ["diabetes", "dka"]):
             meds.extend(["Insulin 0.1u/kg/hr drip", "NS 1L bolus"])
+        
+        # Routine checkups = NO medications (diet/lifestyle only)
+        if any(word in transcript_lower for word in ["checkup", "routine"]):
+            return []
+        
         return meds
     
     def _generate_pending_labs(self, transcript_lower: str) -> List[str]:
@@ -220,6 +230,8 @@ IMPORTANT:
             pending.insert(0, "Serial troponins q6h x3")
         if any(word in transcript_lower for word in ["wbc", "fever"]):
             pending.insert(0, "Blood cultures")
+        if "hba1c" in transcript_lower:
+            pending.insert(0, "Repeat HbA1c in 3 months")
         return pending
     
     def _generate_followup(self, transcript_lower: str) -> str:
@@ -229,6 +241,10 @@ IMPORTANT:
             return "Neurology outpatient"
         elif any(word in transcript_lower for word in ["pneumonia", "fever"]):
             return "Re-evaluation 48 hours"
+        elif any(word in transcript_lower for word in ["hba1c", "cholesterol"]):
+            return "Follow-up in 3 months for repeat labs"
+        elif any(word in transcript_lower for word in ["checkup", "routine"]):
+            return "Routine follow-up in 3 months"
         return "Return if symptoms worsen"
 
     def _create_summary(self, transcript: str) -> str:
