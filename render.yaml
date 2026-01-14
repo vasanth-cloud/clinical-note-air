@@ -2,6 +2,6 @@ services:
   - type: web
     name: clinical-soap-ai
     env: docker
+    region: oregon
+    plan: free
     dockerfilePath: ./Dockerfile
-    port: 8000
-    maxInstances: 2

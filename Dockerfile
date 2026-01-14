@@ -2,22 +2,25 @@ FROM python:3.11-slim
 
 WORKDIR /code
 
-# System deps
+# System dependencies
 RUN apt-get update && apt-get install -y \
-    curl gcc g++ && \
-    rm -rf /var/lib/apt/lists/*
+    curl \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# Python deps (cache layer)
+# Install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy app
+# Copy application code
 COPY app/ ./app/
 
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=3s CMD curl -f http://localhost:8000 || exit 1
+# Create non-root user
+RUN useradd --create-home --shell /bin/bash appuser && \
+    chown -R appuser:appuser /code
+USER appuser
 
-# Production server
 EXPOSE 8000
-CMD ["gunicorn", "app.app:app", "--bind", "0.0.0.0:8000", "--workers", "2", "--timeout", "120", "--worker-class", "uvicorn.workers.UvicornWorker"]
+
+# FIXED: Use uvicorn directly (Render compatible)
+CMD ["uvicorn", "app.app:app", "--host", "0.0.0.0", "--port", "8000"]
