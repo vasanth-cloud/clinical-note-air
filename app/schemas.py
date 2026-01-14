@@ -1,14 +1,14 @@
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Dict, Any
 
 class TranscriptInput(BaseModel):
     transcript: str = Field(..., min_length=20, max_length=10000)
 
 class SOAPNote(BaseModel):
-    subjective: dict
-    objective: dict
+    subjective: Dict[str, str]
+    objective: Dict[str, str]
     assessment: List[str]
-    plan: dict
+    plan: Dict[str, Any]
     visit_summary: str
 
 class InsufficientData(BaseModel):

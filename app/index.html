@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Clinical SOAP Note Generator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 900px;
+      margin: auto;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 40px;
+      border-radius: 20px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+      backdrop-filter: blur(10px);
+    }
+    h1 {
+      text-align: center;
+      color: #2d3748;
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+    .note {
+      text-align: center;
+      color: #718096;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+    textarea {
+      width: 100%;
+      min-height: 200px;
+      padding: 20px;
+      font-size: 16px;
+      border-radius: 12px;
+      border: 2px solid #e2e8f0;
+      resize: vertical;
+      font-family: inherit;
+      box-sizing: border-box;
+      transition: border-color 0.3s;
+    }
+    textarea:focus {
+      outline: none;
+      border-color: #4299e1;
+      box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+    }
+    button {
+      width: 100%;
+      margin-top: 20px;
+      padding: 16px;
+      font-size: 16px;
+      font-weight: 600;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      background: linear-gradient(135deg, #4299e1, #3182ce);
+      color: white;
+      transition: all 0.3s;
+    }
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(66, 153, 225, 0.4);
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+    pre {
+      margin-top: 25px;
+      background: #1a202c;
+      color: #e2e7f0;
+      padding: 25px;
+      border-radius: 12px;
+      overflow-x: auto;
+      font-size: 14px;
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      white-space: pre-wrap;
+      max-height: 500px;
+      overflow-y: auto;
+    }
+    .loading {
+      text-align: center;
+      color: #4299e1;
+      font-style: italic;
+    }
+    .error {
+      color: #e53e3e;
+      background: #fed7d7;
+      border: 1px solid #feb2b2;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🏥 Clinical SOAP Note Generator</h1>
+    <p class="note">Paste patient-doctor conversation transcript. AI generates structured SOAP notes automatically.</p>
+    
+    <textarea id="transcript" 
+              placeholder="Patient: I've had chest pain for 2 days... Doctor: Any shortness of breath? ..."></textarea>
+    
+    <button onclick="generateSOAP()" id="generateBtn">Generate SOAP Note</button>
+    
+    <pre id="output">Enter a clinical transcript above and click Generate...</pre>
+  </div>
+
+  <script>
+    async function generateSOAP() {
+      const transcript = document.getElementById('transcript').value.trim();
+      const output = document.getElementById('output');
+      const btn = document.getElementById('generateBtn');
+
+      if (!transcript) {
+        output.textContent = 'Please enter a clinical transcript first.';
+        output.className = 'error';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Generating...';
+      output.textContent = 'Processing with AI...';
+      output.className = 'loading';
+
+      try {
+        const response = await fetch('/generate-soap', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transcript })
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        
+        if (data.status === 'insufficient_data') {
+          output.textContent = `⚠️  ${data.reason}\n\nTip: Include medical terms like "pain", "fever", "diagnosis", "BP", etc.`;
+          output.className = 'error';
+        } else {
+          output.textContent = JSON.stringify(data, null, 2);
+          output.className = '';
+        }
+      } catch (error) {
+        output.textContent = `Error: ${error.message}\n\nCheck if backend is running and try again.`;
+        output.className = 'error';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Generate SOAP Note';
+      }
+    }
+
+    // Enter key support
+    document.getElementById('transcript').addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.key === 'Enter') {
+        generateSOAP();
+      }
+    });
+  </script>
+</body>
+</html>
